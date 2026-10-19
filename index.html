@@ -1,10 +1,9 @@
 <!doctype html>
-<!-- Niigata Rice Field Puzzle, GameBull web build. This page is the host-facing shell:
-     - the loading page (Unity IdeofuzionBridge template behaviour, playbook section 7): baked blurred backdrop from
-       the client's art, spinner, tenant icon from /context (gameLogoUrl, then gameBannerUrl) with the 4 s / 30 s
-       clocks, the client's rice mark as the built-in icon;
-     - a frame filling the whole page (safe areas excepted) that runs the client's page (app.html) with the same
-       launch URL. Their own Stage Mode screens (stage map, 1-life confirm, results, voucher) are the GameBull UI. -->
+<!-- Niigata Rice Field Puzzle, GameBull web build (portrait). This page is the host-facing shell:
+     - the loading page (Unity IdeofuzionBridge template behaviour, playbook section 7): blurred backdrop baked from
+       the client's art, spinner, tenant icon from /context (gameLogoUrl, then gameBannerUrl) with the 4 s / 30 s clocks;
+     - a frame filling the whole page (safe areas excepted; the client's responsive mobile.css fits their page to
+       it) that runs the game (app.html) with the same launch URL. -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
@@ -12,8 +11,10 @@
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#234d35">
 <title>にいがた 田んぼパズル</title>
-<link rel="icon" href="assets/rice-mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="gb/loader.css">
+<link rel="icon" type="image/png" href="./gb/favicon-EmuosKQa.png">
+  <script type="module" crossorigin src="./gb/index-BARf87u2.js"></script>
+  <link rel="modulepreload" crossorigin href="./gb/nozoom-DqrP0v6j.js">
+  <link rel="stylesheet" crossorigin href="./gb/index-DK9kWzbx.css">
 </head>
 <body>
 <iframe id="gb-frame" title="にいがた 田んぼパズル" allow="autoplay; fullscreen; clipboard-write"></iframe>
@@ -23,9 +24,6 @@
     <div id="unity-progress-bar-empty"><div id="unity-progress-bar-full"></div></div>
     <div id="unity-progress-percent">0%</div>
   </div>
-</div>
-<script src="gb/env.js"></script>
-<script src="gb/nozoom.js"></script>
-<script src="gb/loader.js"></script>
+</div>
 </body>
 </html>
