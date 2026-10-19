@@ -67,6 +67,12 @@
   function pauseButton(show) { var b = $("pause"); if (b) b.style.visibility = show ? "" : "hidden"; }
   // Their ライフ box (GameBull account lives) is not shown in a run: the run's 3 hearts are drawn in its place.
   function livesBox(show) { var b = document.querySelector(".life-display"); if (b) b.style.visibility = show ? "" : "hidden"; }
+  // Their 最高記録 (best score per stage, saved in the browser by their own result screen) is not kept in a run, so
+  // it would always read "—"; and their stage list cannot be opened in a run, so its ▾ goes too. Both hidden for
+  // the run only (space kept, their panel does not shift).
+  function runOnlyHud(show) {
+    [".score-block .best", "#levels > span"].forEach(function (sel) { var e = document.querySelector(sel); if (e) e.style.visibility = show ? "" : "hidden"; });
+  }
 
   // Their result() (called by their frame() one beat after the last move) opens their result dialog; in a run the
   // run rules take over: a clear goes on to the next stage, a dead end restarts the stage.
@@ -181,7 +187,7 @@
     park: function () {
       R = null; gate.run = false; gate.stage = false;
       if (dialog.open) dialog.close();
-      pauseButton(true); livesBox(true);
+      pauseButton(true); livesBox(true); runOnlyHud(true);
       clientLoad(0);
       var label = document.querySelector(".timer small"); if (label) label.textContent = "目安時間";
     },
@@ -194,7 +200,7 @@
         fresh: true, paid: false, hearts: HEARTS, stage: -1, stageEndsAt: 0, cleared: 0, points: 0, steps: 0, bonus: 0, startedAt: now() };
       gate.run = true; gate.stage = false; plan = null;
       if (dialog.open) dialog.close();
-      pauseButton(false); livesBox(false);
+      pauseButton(false); livesBox(false); runOnlyHud(false);
       loadLevel(0);
       if (!R.held) this.go();
     },
