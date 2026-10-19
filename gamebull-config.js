@@ -3,7 +3,7 @@
 window.GAMEBULL_CONFIG = Object.freeze({
   apiBase: 'https://api.staging.g-b.store', // Confirmed API base, including any prefix; HTTPS required in production.
   gameCode: 'RICE_FIELD_PUZZLE',
-  bootTokenParam: 'sessionToken', // Provisional: confirm with the GameBull developer.
+  bootTokenParam: 'bootToken', // Provisional: confirm with the GameBull developer.
   tenantSlugParam: 'tenantSlug',
   livesPath: 'lives.count', // Confirm the existing /context balance field; e.g. lives.remaining.
   requestTimeoutMs: 15000
