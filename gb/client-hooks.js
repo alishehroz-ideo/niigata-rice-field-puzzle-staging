@@ -55,8 +55,11 @@
   update = function () { clientUpdate(); showTimer(); };   // their update() writes the free-game time; show the run's
   var clientRequestMove = requestMove;
   requestMove = function (dx, dy) { if (R && !live()) return; clientRequestMove(dx, dy); };
+  // GameBull run rule: no pause and no in-game menu during a run (playbook). Their pause button is hidden for the run
+  // (its space kept, so their lives box does not move) and their P key / background auto-pause open nothing.
   var clientPauseMenu = pauseMenu;
-  pauseMenu = function () { if (R && !live()) return; clientPauseMenu(); };
+  pauseMenu = function () { if (R) return; clientPauseMenu(); };
+  function pauseButton(show) { var b = $("pause"); if (b) b.style.visibility = show ? "" : "hidden"; }
 
   // Their result() (called by their frame() one beat after the last move) opens their result dialog; in a run the
   // run rules take over: a clear goes on to the next stage, a dead end restarts the stage.
@@ -154,6 +157,7 @@
     park: function () {
       R = null; gate.run = false; gate.stage = false;
       if (dialog.open) dialog.close();
+      pauseButton(true);
       clientLoad(0);
       var label = document.querySelector(".timer small"); if (label) label.textContent = "目安時間";
     },
@@ -166,6 +170,7 @@
         fresh: true, stage: -1, stageEndsAt: 0, cleared: 0, points: 0, steps: 0, bonus: 0, startedAt: now() };
       gate.run = true; gate.stage = false; plan = null;
       if (dialog.open) dialog.close();
+      pauseButton(false);
       loadLevel(0);
       if (!R.held) this.go();
     },
