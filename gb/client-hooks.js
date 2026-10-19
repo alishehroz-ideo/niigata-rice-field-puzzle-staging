@@ -6,14 +6,17 @@
 // A GameBull run (tournament / Score Challenge / solo / room), as agreed for this game:
 //  - starts at stage 1 (the same stages for every player) and plays their stages in order;
 //  - every stage has the client's own time, cells x 3 s (their 目安時間, niigata.js update()), made strict as in
-//    their own GameBull mode: it starts when the stage appears and keeps running while paused;
-//  - a clear loads the next stage at once with its own time; a dead end (or their やり直す) restarts the same
-//    stage with the time it has left; the stage time reaching 0 ends the run (0.7 s zero hold, then the board);
+//    their own GameBull mode: it starts when the stage appears;
+//  - 3 hearts (GameBull run rule, agreed 2026-10-19). Two ways to lose one: a reset (their やり直す, or a dead end,
+//    which can only be reset) and the stage time reaching 0 (0.7 s zero hold first). The stage then restarts with its
+//    full time. The 3rd heart lost ends the run (then the board);
+//  - a clear loads the next stage at once with its own time;
 //  - score = stages cleared x 1000 + the client's own points (their game.score) of those stages.
 (function () {
   "use strict";
   var gate = window.__ngGate;
-  var hooks = { onLock: null, onZero: null, onEnd: null };   // set by the shell
+  var hooks = { onLock: null, onZero: null, onResume: null, onEnd: null };   // set by the shell
+  var HEARTS = 3;
   var STAGE_POINTS = 1000;
   var R = null;            // the current GameBull run, null under the lobby / in their Stage Mode
   var last = null;         // the last run's facts
@@ -42,13 +45,15 @@
   // ---- their functions, wrapped ----
   var clientLoad = loadLevel;
   loadLevel = function (i) {
+    // Their やり直す (button, R key, their confirm dialog) reloads the same stage: in a run that reset costs a heart
+    // when the stage had been played (a reset of an untouched stage changes nothing and is free).
+    var reset = !!R && !R.fresh && !R.paid && i === R.stage && game && game.visited.size > 0;
+    if (reset) { loseHeart(game.state === "lost" ? "dead end, reset" : "reset (their やり直す)"); if (R.locked) return; }   // 3rd heart: no reload, the run ends
     clientLoad(i);
     if (!R) return;
-    // A new stage gets its own time; the same stage again (dead end, their やり直す) keeps what it has left.
-    var restart = i === R.stage && !R.fresh;
-    R.fresh = false; R.stage = i;
-    if (!restart) R.stageEndsAt = now() + stageMs(i);
-    console.log("[NG-GB] Stage " + (i + 1) + (restart ? " restarted, " + Math.ceil(remainingMs() / 1000) + " s left" : " loaded: " + Math.round(stageMs(i) / 1000) + " s (" + LEVELS[i].cells.length + " cells x 3 s)") + "; run score " + total() + ".");
+    R.fresh = false; R.paid = false; R.stage = i;
+    R.stageEndsAt = now() + stageMs(i);
+    console.log("[NG-GB] Stage " + (i + 1) + " loaded: " + Math.round(stageMs(i) / 1000) + " s (" + LEVELS[i].cells.length + " cells x 3 s); run score " + total() + ", hearts " + R.hearts + ".");
     showTimer();
   };
   var clientUpdate = update;
@@ -60,6 +65,8 @@
   var clientPauseMenu = pauseMenu;
   pauseMenu = function () { if (R) return; clientPauseMenu(); };
   function pauseButton(show) { var b = $("pause"); if (b) b.style.visibility = show ? "" : "hidden"; }
+  // Their ライフ box (GameBull account lives) is not shown in a run: the run's 3 hearts are drawn in its place.
+  function livesBox(show) { var b = document.querySelector(".life-display"); if (b) b.style.visibility = show ? "" : "hidden"; }
 
   // Their result() (called by their frame() one beat after the last move) opens their result dialog; in a run the
   // run rules take over: a clear goes on to the next stage, a dead end restarts the stage.
@@ -80,7 +87,7 @@
       if (index + 1 >= LEVELS.length) { R.locked = true; hooks.onLock && hooks.onLock("all"); end("all-cleared"); return; }
       loadLevel(index + 1);
     } else if (game.state === "lost") {
-      console.log("[NG-GB] Stage " + (index + 1) + ": dead end (" + game.visited.size + "/" + game.cells.size + "); restarting it with " + Math.ceil(remainingMs() / 1000) + " s left.");
+      console.log("[NG-GB] Stage " + (index + 1) + ": dead end (" + game.visited.size + "/" + game.cells.size + "); it is reset, which costs a heart.");
       var at = index;
       setTimeout(function () { if (live() && index === at && game.state === "lost") loadLevel(at); }, 600);
     }
@@ -97,18 +104,35 @@
   gate.over.openMap = function () { return !!R; };                     // no stage list during a run
   gate.over.retry = function () { return !!R && !live(); };             // their やり直す works in a live run
 
+  // A heart lost: the 3rd one ends the run.
+  function loseHeart(why) {
+    if (!R || R.ended) return;
+    R.hearts = Math.max(0, R.hearts - 1);
+    console.log("[NG-GB] Heart lost on stage " + (index + 1) + " (" + why + "): " + R.hearts + " left.");
+    if (R.hearts <= 0) { R.locked = true; hooks.onLock && hooks.onLock("hearts"); setTimeout(function () { end("hearts"); }, 700); }
+  }
+  // Stage time at 0: hold "0" for 0.7 s (the shell's countdown), lose a heart, then the stage restarts with its
+  // full time, or the run ends on the 3rd heart.
   function timeUp() {
     R.locked = true; R.zero = true; queued = null;
     if (dialog.open) dialog.close();
-    console.log("[NG-GB] Stage " + (index + 1) + " time is up: run ends with " + R.cleared + " stages cleared, score " + total() + ".");
-    hooks.onLock && hooks.onLock("clock");
-    if (hooks.onZero) hooks.onZero(function () { end("timeout"); }); else setTimeout(function () { end("timeout"); }, 700);
+    console.log("[NG-GB] Stage " + (index + 1) + " time is up.");
+    var after = function () {
+      if (!R || R.ended) return;
+      R.hearts = Math.max(0, R.hearts - 1);
+      console.log("[NG-GB] Heart lost on stage " + (index + 1) + " (time up): " + R.hearts + " left.");
+      if (R.hearts <= 0) { hooks.onLock && hooks.onLock("hearts"); end("hearts"); return; }
+      R.zero = false; R.locked = false; R.paid = true;
+      loadLevel(index);
+      hooks.onResume && hooks.onResume();
+    };
+    if (hooks.onZero) hooks.onZero(after); else setTimeout(after, 700);
   }
   function end(reason) {
     if (!R || R.ended) return;
     R.ended = true; R.locked = true; queued = null;
     if (dialog.open) dialog.close();
-    last = { reason: reason, stages: R.cleared, stagePoints: R.cleared * STAGE_POINTS, points: R.points, steps: R.steps, bonus: R.bonus,
+    last = { reason: reason, hearts: R.hearts, stages: R.cleared, stagePoints: R.cleared * STAGE_POINTS, points: R.points, steps: R.steps, bonus: R.bonus,
       total: total(), reached: index + 1, playMs: Math.round(now() - R.startedAt) };
     console.log("[NG-GB] Run end '" + reason + "': " + last.stages + " stages cleared (x" + STAGE_POINTS + " = " + last.stagePoints + "), their points " + last.points +
       " (" + last.steps + " cells x 10 + straight bonus " + last.bonus + "), total " + last.total + "; last stage on screen " + last.reached + ".");
@@ -157,7 +181,7 @@
     park: function () {
       R = null; gate.run = false; gate.stage = false;
       if (dialog.open) dialog.close();
-      pauseButton(true);
+      pauseButton(true); livesBox(true);
       clientLoad(0);
       var label = document.querySelector(".timer small"); if (label) label.textContent = "目安時間";
     },
@@ -167,10 +191,10 @@
       opt = opt || {};
       devStage = opt.devStageSeconds || 0;
       R = { target: opt.target || 0, limitMs: opt.limitMs || 0, limitEndsAt: 0, held: !!opt.hold, locked: false, zero: false, ended: false,
-        fresh: true, stage: -1, stageEndsAt: 0, cleared: 0, points: 0, steps: 0, bonus: 0, startedAt: now() };
+        fresh: true, paid: false, hearts: HEARTS, stage: -1, stageEndsAt: 0, cleared: 0, points: 0, steps: 0, bonus: 0, startedAt: now() };
       gate.run = true; gate.stage = false; plan = null;
       if (dialog.open) dialog.close();
-      pauseButton(false);
+      pauseButton(false); livesBox(false);
       loadLevel(0);
       if (!R.held) this.go();
     },
@@ -184,6 +208,7 @@
     totalScore: function () { return R ? total() : last ? last.total : 0; },
     remaining: function () { return R && !R.ended ? remainingMs() / 1000 : 0; },
     isRunning: live,
+    hearts: function () { return R ? R.hearts : last ? last.hearts : HEARTS; },
     soundOn: function () { return !!sound; },
     setSound: function (on) { sound = !!on; try { localStorage.setItem("farming-sound", String(sound)); } catch (e) { /* private */ } if (sound) beep(450); },
     // The lives in their header during a run: their own label for a connected game (GameBull連携).
