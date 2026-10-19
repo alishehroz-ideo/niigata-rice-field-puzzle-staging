@@ -1,10 +1,13 @@
 // GameBull gate for the client's own GameBull adapter (their game/gamebull-ui.js, the `GB` object). A classic script
 // the build puts right AFTER their gamebull-ui.js and BEFORE their niigata.js, so it runs before their niigata.js
 // calls GB.initialize() on load. Their files are unchanged.
-// Their adapter is the client's Stage-Clear Mode (their stage map, 1 life per stage start, server progress, voucher).
-// The GameBull web build runs the standard GameBull flow (lobby, tournaments, Score Challenge), so their adapter is
-// kept closed (window.__ngGate.stage stays false): their page behaves as their own free game (their `!enabled`
-// paths), and client-hooks.js runs the GameBull rules on top. Their adapter files ship unchanged.
+// Their adapter is the client's Stage-Clear Mode (their stage map, 1 life per stage start, server progress, voucher),
+// built from GameBull's Stage Mode Integration Guide. Which flow a launch gets is the SERVER's call (the guide):
+//  - /context has `stageMode`: the shell opens the gate (window.__ngGate.stage = true) and calls their own
+//    GB.initialize(); from then on every GB call is theirs, as delivered, and no GameBull screen is drawn;
+//  - `stageMode` is null: the gate stays closed, their page behaves as their own free game (their `!enabled` paths),
+//    and client-hooks.js runs the GameBull run rules (lobby, tournaments, Score Challenge) on top.
+// Their adapter files ship unchanged.
 (function () {
   "use strict";
   var gate = window.__ngGate = { stage: false, run: false, orig: {}, over: {} };
@@ -15,7 +18,7 @@
   Object.defineProperty(GB, "enabled", { get: function () { return enabled && (gate.stage || gate.run); } });
   // What their page sees outside their Stage Mode: their own `!enabled` answers (gamebull-ui.js).
   var free = {
-    initialize: function () {},            // their connection screen + stage map (their Stage-Clear Mode): not opened
+    initialize: function () {},            // their connection screen + stage map: only once the server says Stage Mode
     canMove: function () { return true; },
     canChoose: function () { return true; },
     info: function () { return ""; },
@@ -41,5 +44,5 @@
       return free[k] ? free[k].apply(GB, arguments) : mine.apply(GB, arguments);
     };
   });
-  console.log("[NG-GB] Their Stage-Clear Mode adapter is kept closed (standard GameBull flow).");
+  console.log("[NG-GB] Their Stage-Clear Mode adapter is gated: it opens when /context has stageMode.");
 })();

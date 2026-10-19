@@ -146,9 +146,12 @@
   }
 
   // ---- sound ----
-  // GameBull: sound ON until the player chooses (their own default is OFF: niigata.js reads 'farming-sound').
-  // The GameBull mute and their own pause-menu toggle (効果音) are the same switch: their `sound` and their key.
-  try { if (localStorage.getItem("farming-sound") === null) { sound = true; console.log("[NG-GB] Sound ON by default (no saved choice yet)."); } } catch (e) { /* private mode */ }
+  // GameBull flow only: sound ON until the player chooses (their own default is OFF: niigata.js reads
+  // 'farming-sound'); their Stage-Clear Mode keeps their default. The GameBull mute and their own pause-menu toggle
+  // (効果音) are the same switch: their `sound` and their key.
+  function gameBullSoundDefault() {
+    try { if (localStorage.getItem("farming-sound") === null) { sound = true; console.log("[NG-GB] Sound ON by default (no saved choice yet)."); } } catch (e) { /* private mode */ }
+  }
   // iPhone / Safari: their beeps are Web Audio, made by beep() on the player's moves. iPhone only starts a context
   // inside a tap and plays Web Audio under the silent switch, so while their sound is ON their context is created /
   // resumed (and primed) on the player's taps, and the audio session is "playback" (iOS 16.4+).
@@ -217,6 +220,16 @@
     hearts: function () { return R ? R.hearts : last ? last.hearts : HEARTS; },
     soundOn: function () { return !!sound; },
     setSound: function (on) { sound = !!on; try { localStorage.setItem("farming-sound", String(sound)); } catch (e) { /* private */ } if (sound) beep(450); },
+    gameBullSoundDefault: gameBullSoundDefault,
+    // The server says Stage Mode (/context stageMode): the client's own Stage-Clear Mode, exactly as they built it
+    // (their connection screen, stage map, 1-life confirm, results, voucher, their HUD and pause menu, their APIs).
+    enterStageMode: function () {
+      R = null; gate.run = false; gate.stage = true; plan = null;
+      if (dialog.open) dialog.close();
+      pauseButton(true); livesBox(true); runOnlyHud(true);
+      console.log("[NG-GB] Stage Mode launch: the client's own Stage-Clear Mode takes over (their GB.initialize()).");
+      GB.initialize();
+    },
     // The lives in their header during a run: their own label for a connected game (GameBull連携).
     showLives: function (n) {
       $("life-count").textContent = n == null ? "—" : String(n);
