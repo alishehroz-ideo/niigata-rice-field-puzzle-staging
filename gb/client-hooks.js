@@ -168,6 +168,24 @@
   }
   ["touchend", "pointerup", "click", "keydown"].forEach(function (t) { document.addEventListener(t, unlock, { capture: true, passive: true }); });
 
+  // ---- their Stage-Clear Mode: never leave the player on a finished board ----
+  // QA 2026-10-20: after a stage is cleared or lost, closing their result popup with × (or Esc) left the finished
+  // board on screen; their pause button opens only while a stage is ready / playing (niigata.js) and the arrows do
+  // nothing, so the game looked stuck until their やり直す. In their Stage Mode, closing a popup while the board is
+  // finished (no attempt running) now opens their stage list instead, exactly as their 田んぼ一覧 button does
+  // (their own GB.openMap(): it also resends an unsent clear first). Everything else is theirs, unchanged.
+  function finishedStage() { return gate.stage && !!game && (game.state === "won" || game.state === "lost") && !GB.canMove(); }
+  var clientCloseModal = closeModal;
+  closeModal = function () {   // their Esc handler (dialog 'cancel') calls closeModal() by name
+    if (finishedStage()) { console.log("[NG-GB] Stage Mode: popup closed on a finished stage; opening their stage list."); GB.openMap(); return; }
+    clientCloseModal();
+  };
+  var closeBtn = document.getElementById("close-modal");   // their × keeps the reference it got on load: catch it first
+  if (closeBtn) closeBtn.addEventListener("click", function (e) {
+    if (!finishedStage()) return;
+    e.stopImmediatePropagation(); e.preventDefault(); closeModal();
+  }, true);
+
   // ---- their voucher button inside the GameBull app ----
   // Their 「GameBullでギフト券を開く」 (gamebull-ui.js rewardHtml: <a class="gb-coupon" href=reward.redeemUrl
   // target="_blank">) cannot open inside the GameBull app: its game frame has no allow-popups / allow-top-navigation.
