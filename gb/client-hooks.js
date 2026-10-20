@@ -168,6 +168,24 @@
   }
   ["touchend", "pointerup", "click", "keydown"].forEach(function (t) { document.addEventListener(t, unlock, { capture: true, passive: true }); });
 
+  // ---- their voucher button inside the GameBull app ----
+  // Their 「GameBullでギフト券を開く」 (gamebull-ui.js rewardHtml: <a class="gb-coupon" href=reward.redeemUrl
+  // target="_blank">) cannot open inside the GameBull app: its game frame has no allow-popups / allow-top-navigation.
+  // Embedded, the tap closes the game the way the app's Done button does (gamebull:close, through the loading page's
+  // relay), and names the coupon page `to: /coupons/<id>` for when the app opens it (ignored by the app today; the
+  // coupon is already in the player's Coupons). Opened outside the app, their link works as they made it.
+  function embedded() { try { return window.parent !== window && window.parent.parent !== window.parent; } catch (e) { return true; } }
+  document.addEventListener("click", function (e) {
+    var a = e.target && e.target.closest && e.target.closest("a.gb-coupon");
+    if (!a || !embedded()) return;
+    e.preventDefault(); e.stopPropagation();
+    var to;
+    try { var u = new URL(a.href); if (/^\/coupons\/[^/]+$/.test(u.pathname)) to = u.pathname; } catch (err) { /* no path */ }
+    var msg = { type: "gamebull:close" }; if (to) msg.to = to;
+    console.log("[NG-GB] Voucher button inside the GameBull app: closing the game " + JSON.stringify(msg) + ".");
+    window.parent.postMessage(msg, location.origin);
+  }, true);
+
   // ---- localhost autoplay: their own requestMove(), path found on their board ----
   var plan = null;
   function solveFromHere() {
