@@ -168,21 +168,34 @@
   }
   ["touchend", "pointerup", "click", "keydown"].forEach(function (t) { document.addEventListener(t, unlock, { capture: true, passive: true }); });
 
-  // ---- their Stage-Clear Mode: never leave the player on a finished board ----
-  // QA 2026-10-20: after a stage is cleared or lost, closing their result popup with × (or Esc) left the finished
-  // board on screen; their pause button opens only while a stage is ready / playing (niigata.js) and the arrows do
-  // nothing, so the game looked stuck until their やり直す. In their Stage Mode, closing a popup while the board is
-  // finished (no attempt running) now opens their stage list instead, exactly as their 田んぼ一覧 button does
-  // (their own GB.openMap(): it also resends an unsent clear first). Everything else is theirs, unchanged.
-  function finishedStage() { return gate.stage && !!game && (game.state === "won" || game.state === "lost") && !GB.canMove(); }
+  // ---- their Stage-Clear Mode: closing a popup never leaves a dead board ----
+  // In their Stage Mode a stage can only be played after their 1-life start; with no attempt running, their board
+  // does not move, their timer shows "—" and their pause opens only on a ready / playing stage (niigata.js). Their ×
+  // (and Esc) simply closed any popup onto that board.
+  //  - QA 2026-10-20: × on a cleared / failed result left the finished board on screen ("stuck, pause does nothing").
+  //  - Bug list 2026-10-21 (#1): × on their stage list without choosing a stage showed stage 1 with no controls or
+  //    timer; (#2): after build 10, × on the stage list reopened the list, so the button looked broken. Asked for:
+  //    "remove the Close button or make it return the player to the main menu, where the player selects the game
+  //    mode" = the GameBull app's game page (Play Stage Mode / Game Start).
+  // So, in their Stage Mode, while NO attempt is running:
+  //  - × / Esc on their stage list closes the game back to the GameBull app (gamebull:close, through the loading
+  //    page's relay, like the TOP button); opened outside the app there is nowhere to go back to, so the list stays;
+  //  - × / Esc on any other popup (result, out of lives, confirm, notices) opens their stage list (their own
+  //    GB.openMap(), exactly as their 田んぼ一覧 button; it also resends an unsent clear first).
+  // While an attempt IS running (e.g. their 田んぼ一覧 or pause opened mid-stage), × is theirs, unchanged.
+  function noAttempt() { return gate.stage && !GB.canMove(); }
+  function onStageList() { var k = document.getElementById("modal-kicker"); return !!k && k.textContent === "田んぼを選ぶ"; }
   var clientCloseModal = closeModal;
   closeModal = function () {   // their Esc handler (dialog 'cancel') calls closeModal() by name
-    if (finishedStage()) { console.log("[NG-GB] Stage Mode: popup closed on a finished stage; opening their stage list."); GB.openMap(); return; }
-    clientCloseModal();
+    if (!noAttempt() || !GB.canClose()) return clientCloseModal();
+    if (!onStageList()) { console.log("[NG-GB] Stage Mode: popup closed with no stage running; opening their stage list."); GB.openMap(); return; }
+    if (!embedded()) { console.log("[NG-GB] Stage Mode: stage list closed outside the GameBull app; nothing to return to, the list stays."); return; }
+    console.log("[NG-GB] Stage Mode: stage list closed with no stage running; back to the GameBull game page (gamebull:close).");
+    window.parent.postMessage({ type: "gamebull:close" }, location.origin);
   };
   var closeBtn = document.getElementById("close-modal");   // their × keeps the reference it got on load: catch it first
   if (closeBtn) closeBtn.addEventListener("click", function (e) {
-    if (!finishedStage()) return;
+    if (!noAttempt()) return;
     e.stopImmediatePropagation(); e.preventDefault(); closeModal();
   }, true);
 
